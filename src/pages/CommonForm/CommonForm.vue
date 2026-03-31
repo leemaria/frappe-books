@@ -114,6 +114,15 @@
         />
       </div>
 
+      <!-- Manufacture Stock Movement Section -->
+      <div
+        v-if="isManufactureStockMovement"
+        class="px-4 py-2 border-t dark:border-gray-800 flex-shrink-0 bg-gray-50 dark:bg-gray-850"
+      >
+        <!-- Manufacture-specific content goes here -->
+        Test
+      </div>
+
       <!-- Tab Bar -->
       <div
         v-if="groupedFields && groupedFields.size > 1"
@@ -378,6 +387,15 @@ export default defineComponent({
       }
 
       return getGroupedActionsForDoc(this.doc);
+    },
+    isManufactureStockMovement(): boolean {
+      if (!this.hasDoc) {
+        return false;
+      }
+      return (
+        this.schemaName === 'StockMovement' &&
+        this.doc.movementType === 'Manufacture'
+      );
     },
   },
   beforeMount() {
