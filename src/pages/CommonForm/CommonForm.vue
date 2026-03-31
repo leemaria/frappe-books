@@ -121,7 +121,7 @@
       >
         <div class="flex items-center justify-between mb-2">
           <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">
-            {{ t`Raw Material Stock Values` }}
+            {{ t`Raw Material Values` }}
           </h3>
           <button
             v-if="rawMaterialValues.length > 0"
@@ -150,9 +150,9 @@
                 <th class="text-left py-1 pr-4">{{ t`Item` }}</th>
                 <th class="text-left py-1 pr-4">{{ t`Location` }}</th>
                 <th v-if="hasBatches" class="text-left py-1 pr-4">{{ t`Batch` }}</th>
-                <th class="text-right py-1 pr-4">{{ t`Stock Qty` }}</th>
+                <th class="text-right py-1 pr-4">{{ t`Quantity` }}</th>
                 <th class="text-right py-1 pr-4">{{ t`Valuation Rate` }}</th>
-                <th class="text-right py-1">{{ t`Stock Value` }}</th>
+                <th class="text-right py-1">{{ t`Total Value` }}</th>
               </tr>
             </thead>
             <tbody>
@@ -628,13 +628,17 @@ export default defineComponent({
         );
 
         if (valuationDetails) {
+          // Use the movement quantity from the items table, not stock quantity
+          const movementQty = row.quantity ?? 0;
+          const movementValue = movementQty * valuationDetails.valuationRate;
+
           values.push({
             item: row.item,
             location: row.fromLocation,
             batch: row.batch ?? undefined,
-            quantity: valuationDetails.quantity,
+            quantity: movementQty,
             valuationRate: valuationDetails.valuationRate,
-            value: valuationDetails.value,
+            value: movementValue,
           });
         }
       }
