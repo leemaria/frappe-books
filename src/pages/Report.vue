@@ -38,6 +38,15 @@
         :read-only="loading"
         @change="async (value) => await report?.set(field.fieldname, value)"
       />
+      <!-- Stock Movement Value Placeholder -->
+      <div
+        v-if="showStockMovementValue"
+        class="col-span-2 flex items-center self-end"
+      >
+        <span class="text-med text-gray-600 dark:text-gray-400">
+          {{ t`Value` }}: {{ fyo.format(0, 'Currency') }}
+        </span>
+      </div>
     </div>
 
     <!-- Report Body -->
@@ -117,6 +126,12 @@ export default defineComponent({
       }, {} as Record<string, ActionGroup>);
 
       return Object.values(actionsMap);
+    },
+    showStockMovementValue(): boolean {
+      return (
+        this.reportClassName === 'StockLedger' &&
+        this.report?.referenceType === 'StockMovement'
+      );
     },
   },
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
