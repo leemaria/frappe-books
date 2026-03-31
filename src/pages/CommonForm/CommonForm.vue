@@ -121,10 +121,10 @@
       >
         <div class="flex items-center justify-between mb-2">
           <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">
-            {{ t`Raw Material Values` }}
+            {{ t`Manufacture Summary` }}
           </h3>
           <button
-            v-if="rawMaterialValues.length > 0"
+            v-if="manufactureValues.length > 0"
             class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
             @click="updateRawMaterialValues"
           >
@@ -137,10 +137,10 @@
         </div>
 
         <div
-          v-else-if="rawMaterialValues.length === 0"
+          v-else-if="manufactureValues.length === 0"
           class="text-sm text-gray-500 italic"
         >
-          {{ t`No raw materials with From Location selected` }}
+          {{ t`No items with Location selected` }}
         </div>
 
         <div v-else class="overflow-x-auto">
@@ -148,48 +148,6 @@
             <thead>
               <tr class="text-gray-600 dark:text-gray-400 border-b dark:border-gray-700">
                 <th class="text-left py-1 pr-4">{{ t`Item` }}</th>
-                <th class="text-left py-1 pr-4">{{ t`Location` }}</th>
-                <th v-if="hasBatches" class="text-left py-1 pr-4">{{ t`Batch` }}</th>
-                <th class="text-right py-1 pr-4">{{ t`Quantity` }}</th>
-                <th class="text-right py-1 pr-4">{{ t`Valuation Rate` }}</th>
-                <th class="text-right py-1">{{ t`Total Value` }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="(rm, idx) in rawMaterialValues"
-                :key="idx"
-                class="border-b dark:border-gray-800 last:border-0"
-              >
-                <td class="py-2 pr-4">{{ rm.item }}</td>
-                <td class="py-2 pr-4">{{ rm.location }}</td>
-                <td v-if="hasBatches" class="py-2 pr-4">{{ rm.batch || '-' }}</td>
-                <td class="py-2 pr-4 text-right">{{ fyo.format(rm.quantity, 'Float') }}</td>
-                <td class="py-2 pr-4 text-right">{{ fyo.format(rm.valuationRate, 'Currency') }}</td>
-                <td class="py-2 pr-4 text-right font-semibold">
-                  {{ fyo.format(rm.value, 'Currency') }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Finished Goods Section -->
-      <div
-        v-if="isManufactureStockMovement && finishedGoodsValues.length > 0"
-        class="px-4 py-3 border-t dark:border-gray-800 flex-shrink-0 bg-gray-50 dark:bg-gray-850"
-      >
-        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
-          {{ t`Finished Goods` }}
-        </h3>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="text-gray-600 dark:text-gray-400 border-b dark:border-gray-700">
-                <th class="text-left py-1 pr-4">{{ t`Item` }}</th>
-                <th class="text-left py-1 pr-4">{{ t`Location` }}</th>
-                <th v-if="hasBatches" class="text-left py-1 pr-4">{{ t`Batch` }}</th>
                 <th class="text-right py-1 pr-4">{{ t`Quantity` }}</th>
                 <th class="text-right py-1 pr-4">{{ t`Rate` }}</th>
                 <th class="text-right py-1">{{ t`Total Value` }}</th>
@@ -197,17 +155,15 @@
             </thead>
             <tbody>
               <tr
-                v-for="(fg, idx) in finishedGoodsValues"
+                v-for="(mv, idx) in manufactureValues"
                 :key="idx"
                 class="border-b dark:border-gray-800 last:border-0"
               >
-                <td class="py-2 pr-4">{{ fg.item }}</td>
-                <td class="py-2 pr-4">{{ fg.location }}</td>
-                <td v-if="hasBatches" class="py-2 pr-4">{{ fg.batch || '-' }}</td>
-                <td class="py-2 pr-4 text-right">{{ fyo.format(fg.quantity, 'Float') }}</td>
-                <td class="py-2 pr-4 text-right">{{ fyo.format(fg.rate, 'Currency') }}</td>
+                <td class="py-2 pr-4">{{ mv.item }}</td>
+                <td class="py-2 pr-4 text-right">{{ fyo.format(mv.quantity, 'Float') }}</td>
+                <td class="py-2 pr-4 text-right">{{ fyo.format(mv.rate, 'Currency') }}</td>
                 <td class="py-2 pr-4 text-right font-semibold">
-                  {{ fyo.format(fg.value, 'Currency') }}
+                  {{ fyo.format(mv.value, 'Currency') }}
                 </td>
               </tr>
             </tbody>
@@ -356,18 +312,8 @@ export default defineComponent({
       showLinks: false,
       useFullWidth: false,
       row: null,
-      rawMaterialValues: [] as Array<{
+      manufactureValues: [] as Array<{
         item: string;
-        location: string;
-        batch?: string;
-        quantity: number;
-        valuationRate: number;
-        value: number;
-      }>,
-      finishedGoodsValues: [] as Array<{
-        item: string;
-        location: string;
-        batch?: string;
         quantity: number;
         rate: number;
         value: number;
@@ -381,18 +327,8 @@ export default defineComponent({
       showLinks: boolean;
       useFullWidth: boolean;
       row: null | { index: number; fieldname: string };
-      rawMaterialValues: Array<{
+      manufactureValues: Array<{
         item: string;
-        location: string;
-        batch?: string;
-        quantity: number;
-        valuationRate: number;
-        value: number;
-      }>;
-      finishedGoodsValues: Array<{
-        item: string;
-        location: string;
-        batch?: string;
         quantity: number;
         rate: number;
         value: number;
@@ -654,8 +590,7 @@ export default defineComponent({
     },
     async updateRawMaterialValues() {
       if (!this.isManufactureStockMovement || !this.doc.items) {
-        this.rawMaterialValues = [];
-        this.finishedGoodsValues = [];
+        this.manufactureValues = [];
         return;
       }
 
@@ -663,16 +598,14 @@ export default defineComponent({
       const rawMaterials = this.doc.items.filter((item) => item.fromLocation);
       const finishedGoods = this.doc.items.filter((item) => item.toLocation);
 
-      // Process raw materials
-      const rawMaterialValues: Array<{
+      const values: Array<{
         item: string;
-        location: string;
-        batch?: string;
         quantity: number;
-        valuationRate: number;
+        rate: number;
         value: number;
       }> = [];
 
+      // Process raw materials
       for (const row of rawMaterials) {
         if (!row.item || !row.fromLocation) {
           continue;
@@ -690,34 +623,22 @@ export default defineComponent({
           const movementQty = row.quantity ?? 0;
           const movementValue = movementQty * valuationDetails.valuationRate;
 
-          rawMaterialValues.push({
+          values.push({
             item: row.item,
-            location: row.fromLocation,
-            batch: row.batch ?? undefined,
             quantity: movementQty,
-            valuationRate: valuationDetails.valuationRate,
+            rate: valuationDetails.valuationRate,
             value: movementValue,
           });
         }
       }
 
       // Process finished goods (use entered rate and quantity)
-      const finishedGoodsValues: Array<{
-        item: string;
-        location: string;
-        batch?: string;
-        quantity: number;
-        rate: number;
-        value: number;
-      }> = [];
-
       for (const row of finishedGoods) {
         if (!row.item || !row.toLocation) {
           continue;
         }
 
         const qty = row.quantity ?? 0;
-        // Convert Money object to number using .float property
         const rateValue = row.rate;
         const rate =
           typeof rateValue === 'object' && rateValue !== null && 'float' in rateValue
@@ -725,18 +646,15 @@ export default defineComponent({
             : Number(rateValue ?? 0);
         const value = qty * rate;
 
-        finishedGoodsValues.push({
+        values.push({
           item: row.item,
-          location: row.toLocation,
-          batch: row.batch ?? undefined,
           quantity: qty,
           rate: rate,
           value: value,
         });
       }
 
-      this.rawMaterialValues = rawMaterialValues;
-      this.finishedGoodsValues = finishedGoodsValues;
+      this.manufactureValues = values;
       this.loadingValuation = false;
     },
     async onRowChange(field: Field, value: DocValue, parentField: Field) {
