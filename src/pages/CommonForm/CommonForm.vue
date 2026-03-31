@@ -110,7 +110,7 @@
           :errors="errors"
           @editrow="(doc: Doc) => showRowEditForm(doc)"
           @value-change="onValueChange"
-          @row-change="updateGroupedFields"
+          @row-change="onRowChange"
         />
       </div>
 
@@ -641,6 +641,15 @@ export default defineComponent({
 
       this.rawMaterialValues = values;
       this.loadingValuation = false;
+    },
+    async onRowChange(field: Field, value: DocValue, parentField: Field) {
+      // Update grouped fields first
+      this.updateGroupedFields();
+
+      // Update raw material values if the changed row belongs to items table
+      if (parentField.fieldname === 'items' && this.isManufactureStockMovement) {
+        await this.updateRawMaterialValues();
+      }
     },
   },
 });
