@@ -157,13 +157,24 @@
               <tr
                 v-for="(mv, idx) in manufactureValues"
                 :key="idx"
-                class="border-b dark:border-gray-800 last:border-0"
+                class="border-b dark:border-gray-800"
               >
                 <td class="py-2 pr-4">{{ mv.item }}</td>
                 <td class="py-2 pr-4 text-right">{{ fyo.format(mv.quantity, 'Float') }}</td>
                 <td class="py-2 pr-4 text-right">{{ fyo.format(mv.rate, 'Currency') }}</td>
                 <td class="py-2 pr-4 text-right font-semibold">
                   {{ fyo.format(mv.value, 'Currency') }}
+                </td>
+              </tr>
+              <!-- Balance Row -->
+              <tr class="border-t-2 dark:border-gray-600 font-semibold">
+                <td class="py-2 pr-4" :class="manufactureBalance === 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                  {{ t`Balance` }}
+                </td>
+                <td class="py-2 pr-4"></td>
+                <td class="py-2 pr-4"></td>
+                <td class="py-2 pr-4 text-right" :class="manufactureBalance === 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                  {{ fyo.format(manufactureBalance, 'Currency') }}
                 </td>
               </tr>
             </tbody>
@@ -314,6 +325,7 @@ export default defineComponent({
       row: null,
       manufactureValues: [] as Array<{
         item: string;
+        type: 'raw' | 'finished';
         quantity: number;
         rate: number;
         value: number;
@@ -329,6 +341,7 @@ export default defineComponent({
       row: null | { index: number; fieldname: string };
       manufactureValues: Array<{
         item: string;
+        type: 'raw' | 'finished';
         quantity: number;
         rate: number;
         value: number;
@@ -462,6 +475,11 @@ export default defineComponent({
     },
     hasBatches(): boolean {
       return !!this.fyo.singles.InventorySettings?.enableBatches;
+    },
+    manufactureBalance(): number {
+      return this.manufactureValues.reduce((sum, item) => {
+        return sum + (item.type === 'finished' ? item.value : -item.value);
+      }, 0);
     },
   },
   beforeMount() {
@@ -600,6 +618,7 @@ export default defineComponent({
 
       const values: Array<{
         item: string;
+        type: 'raw' | 'finished';
         quantity: number;
         rate: number;
         value: number;
@@ -625,6 +644,7 @@ export default defineComponent({
 
           values.push({
             item: row.item,
+            type: 'raw',
             quantity: movementQty,
             rate: valuationDetails.valuationRate,
             value: movementValue,
@@ -648,6 +668,7 @@ export default defineComponent({
 
         values.push({
           item: row.item,
+          type: 'finished',
           quantity: qty,
           rate: rate,
           value: value,
