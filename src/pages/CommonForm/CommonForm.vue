@@ -117,10 +117,62 @@
       <!-- Manufacture Stock Movement Section -->
       <div
         v-if="isManufactureStockMovement"
-        class="px-4 py-2 border-t dark:border-gray-800 flex-shrink-0 bg-gray-50 dark:bg-gray-850"
+        class="px-4 py-3 border-t dark:border-gray-800 flex-shrink-0 bg-gray-50 dark:bg-gray-850"
       >
-        <!-- Manufacture-specific content goes here -->
-        Test
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">
+            {{ t`Raw Material Stock Values` }}
+          </h3>
+          <button
+            v-if="rawMaterialValues.length > 0"
+            class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            @click="updateRawMaterialValues"
+          >
+            {{ t`Refresh` }}
+          </button>
+        </div>
+
+        <div v-if="loadingValuation" class="text-sm text-gray-500">
+          {{ t`Loading...` }}
+        </div>
+
+        <div
+          v-else-if="rawMaterialValues.length === 0"
+          class="text-sm text-gray-500 italic"
+        >
+          {{ t`No raw materials with From Location selected` }}
+        </div>
+
+        <div v-else class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-gray-600 dark:text-gray-400 border-b dark:border-gray-700">
+                <th class="text-left py-1 pr-4">{{ t`Item` }}</th>
+                <th class="text-left py-1 pr-4">{{ t`Location` }}</th>
+                <th v-if="hasBatches" class="text-left py-1 pr-4">{{ t`Batch` }}</th>
+                <th class="text-right py-1 pr-4">{{ t`Stock Qty` }}</th>
+                <th class="text-right py-1 pr-4">{{ t`Valuation Rate` }}</th>
+                <th class="text-right py-1">{{ t`Stock Value` }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(rm, idx) in rawMaterialValues"
+                :key="idx"
+                class="border-b dark:border-gray-800 last:border-0"
+              >
+                <td class="py-2 pr-4">{{ rm.item }}</td>
+                <td class="py-2 pr-4">{{ rm.location }}</td>
+                <td v-if="hasBatches" class="py-2 pr-4">{{ rm.batch || '-' }}</td>
+                <td class="py-2 pr-4 text-right">{{ fyo.format(rm.quantity, 'Float') }}</td>
+                <td class="py-2 pr-4 text-right">{{ fyo.format(rm.valuationRate, 'Currency') }}</td>
+                <td class="py-2 pr-4 text-right font-semibold">
+                  {{ fyo.format(rm.value, 'Currency') }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Tab Bar -->
@@ -186,6 +238,7 @@ import { DocValue } from 'fyo/core/types';
 import { Doc } from 'fyo/model/doc';
 import { DEFAULT_CURRENCY } from 'fyo/utils/consts';
 import { ValidationError } from 'fyo/utils/errors';
+import { getCurrentValuationDetails } from 'reports/inventory/helpers';
 import { getDocStatus } from 'models/helpers';
 import { ModelNameEnum } from 'models/types';
 import { Field, Schema } from 'schemas/types';
@@ -263,6 +316,15 @@ export default defineComponent({
       showLinks: false,
       useFullWidth: false,
       row: null,
+      rawMaterialValues: [] as Array<{
+        item: string;
+        location: string;
+        batch?: string;
+        quantity: number;
+        valuationRate: number;
+        value: number;
+      }>,
+      loadingValuation: false,
     } as {
       errors: Record<string, string>;
       activeTab: string;
@@ -271,6 +333,15 @@ export default defineComponent({
       showLinks: boolean;
       useFullWidth: boolean;
       row: null | { index: number; fieldname: string };
+      rawMaterialValues: Array<{
+        item: string;
+        location: string;
+        batch?: string;
+        quantity: number;
+        valuationRate: number;
+        value: number;
+      }>;
+      loadingValuation: boolean;
     };
   },
   computed: {
@@ -397,6 +468,9 @@ export default defineComponent({
         this.doc.movementType === 'Manufacture'
       );
     },
+    hasBatches(): boolean {
+      return !!this.fyo.singles.InventorySettings?.enableBatches;
+    },
   },
   beforeMount() {
     this.useFullWidth = !!this.fyo.singles.Misc?.useFullWidth;
@@ -513,6 +587,60 @@ export default defineComponent({
       }
 
       this.updateGroupedFields();
+
+      // Update raw material values if items changed for Manufacture
+      if (
+        this.isManufactureStockMovement &&
+        fieldname === 'items'
+      ) {
+        await this.updateRawMaterialValues();
+      }
+    },
+    async updateRawMaterialValues() {
+      if (!this.isManufactureStockMovement || !this.doc.items) {
+        this.rawMaterialValues = [];
+        return;
+      }
+
+      this.loadingValuation = true;
+      const rawMaterials = this.doc.items.filter((item) => item.fromLocation);
+
+      const values: Array<{
+        item: string;
+        location: string;
+        batch?: string;
+        quantity: number;
+        valuationRate: number;
+        value: number;
+      }> = [];
+
+      for (const row of rawMaterials) {
+        if (!row.item || !row.fromLocation) {
+          continue;
+        }
+
+        const valuationDetails = await getCurrentValuationDetails(
+          this.fyo,
+          row.item,
+          row.fromLocation,
+          row.batch ?? null,
+          this.doc.date
+        );
+
+        if (valuationDetails) {
+          values.push({
+            item: row.item,
+            location: row.fromLocation,
+            batch: row.batch ?? undefined,
+            quantity: valuationDetails.quantity,
+            valuationRate: valuationDetails.valuationRate,
+            value: valuationDetails.value,
+          });
+        }
+      }
+
+      this.rawMaterialValues = values;
+      this.loadingValuation = false;
     },
   },
 });
