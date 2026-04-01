@@ -33,7 +33,7 @@
 import { isPesa } from 'fyo/utils';
 import { Money } from 'pesa';
 import { fyo } from 'src/initFyo';
-import { safeParsePesa } from 'utils/index';
+import { evaluateMathExpression, safeParsePesa } from 'utils/index';
 import { defineComponent, nextTick } from 'vue';
 import Float from './Float.vue';
 
@@ -59,6 +59,10 @@ export default defineComponent({
     }
   },
   computed: {
+    inputType() {
+      // Use 'text' to allow math operators like /, *, +, -
+      return 'text';
+    },
     formattedValue() {
       const value = this.parse(this.value);
       return fyo.format(value, this.df, this.doc);
@@ -96,7 +100,13 @@ export default defineComponent({
       }
 
       this.showInput = false;
-      this.triggerChange(target.value);
+
+      // Try to evaluate as math expression first
+      const inputValue = target.value;
+      const evaluated = evaluateMathExpression(inputValue);
+      const valueToUse = isNaN(evaluated) ? inputValue : evaluated;
+
+      this.triggerChange(valueToUse);
     },
     activateInput() {
       if (this.isReadOnly) {

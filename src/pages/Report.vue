@@ -38,6 +38,15 @@
         :read-only="loading"
         @change="async (value) => await report?.set(field.fieldname, value)"
       />
+      <!-- Stock Movement Value -->
+      <div
+        v-if="showStockMovementValue"
+        class="col-span-2 flex items-center self-end"
+      >
+        <span class="text-med text-gray-600 dark:text-gray-400">
+          {{ t`Value` }}: {{ fyo.format(stockMovementValue, 'Currency') }}
+        </span>
+      </div>
     </div>
 
     <!-- Report Body -->
@@ -117,6 +126,23 @@ export default defineComponent({
       }, {} as Record<string, ActionGroup>);
 
       return Object.values(actionsMap);
+    },
+    showStockMovementValue(): boolean {
+      return (
+        this.reportClassName === 'StockLedger' &&
+        this.report?.referenceType === 'StockMovement'
+      );
+    },
+    stockMovementValue(): number {
+      if (!this.showStockMovementValue || !this.report?.reportData) {
+        return 0;
+      }
+
+      return this.report.reportData.reduce((sum, row) => {
+        const valueChangeCell = row.cells[9];
+        const valueChange = valueChangeCell?.rawValue ?? 0;
+        return sum + (typeof valueChange === 'number' ? valueChange : 0);
+      }, 0);
     },
   },
   // eslint-disable-next-line @typescript-eslint/no-misused-promises

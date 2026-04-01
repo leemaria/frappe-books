@@ -110,8 +110,76 @@
           :errors="errors"
           @editrow="(doc: Doc) => showRowEditForm(doc)"
           @value-change="onValueChange"
-          @row-change="updateGroupedFields"
+          @row-change="onRowChange"
         />
+      </div>
+
+      <!-- Manufacture Stock Movement Section -->
+      <div
+        v-if="isManufactureStockMovement"
+        class="px-4 py-3 border-t dark:border-gray-800 flex-shrink-0 bg-gray-50 dark:bg-gray-850"
+      >
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">
+            {{ t`Manufacture Summary` }}
+          </h3>
+          <button
+            v-if="manufactureValues.length > 0"
+            class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            @click="updateRawMaterialValues"
+          >
+            {{ t`Refresh` }}
+          </button>
+        </div>
+
+        <div v-if="loadingValuation" class="text-sm text-gray-500">
+          {{ t`Loading...` }}
+        </div>
+
+        <div
+          v-else-if="manufactureValues.length === 0"
+          class="text-sm text-gray-500 italic"
+        >
+          {{ t`No items with Location selected` }}
+        </div>
+
+        <div v-else class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-gray-600 dark:text-gray-400 border-b dark:border-gray-700">
+                <th class="text-left py-1 pr-4">{{ t`Item` }}</th>
+                <th class="text-right py-1 pr-4">{{ t`Quantity` }}</th>
+                <th class="text-right py-1 pr-4">{{ t`Rate` }}</th>
+                <th class="text-right py-1">{{ t`Total Value` }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(mv, idx) in manufactureValues"
+                :key="idx"
+                class="border-b dark:border-gray-800"
+              >
+                <td class="py-2 pr-4">{{ mv.item }}</td>
+                <td class="py-2 pr-4 text-right">{{ fyo.format(mv.quantity, 'Float') }}</td>
+                <td class="py-2 pr-4 text-right">{{ fyo.format(mv.rate, 'Currency') }}</td>
+                <td class="py-2 pr-4 text-right font-semibold">
+                  {{ fyo.format(mv.value, 'Currency') }}
+                </td>
+              </tr>
+              <!-- Balance Row -->
+              <tr class="border-t-2 dark:border-gray-600 font-semibold">
+                <td class="py-2 pr-4" :class="manufactureBalance === 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                  {{ t`Balance` }}
+                </td>
+                <td class="py-2 pr-4"></td>
+                <td class="py-2 pr-4"></td>
+                <td class="py-2 pr-4 text-right" :class="manufactureBalance === 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                  {{ fyo.format(manufactureBalance, 'Currency') }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Tab Bar -->
@@ -177,6 +245,7 @@ import { DocValue } from 'fyo/core/types';
 import { Doc } from 'fyo/model/doc';
 import { DEFAULT_CURRENCY } from 'fyo/utils/consts';
 import { ValidationError } from 'fyo/utils/errors';
+import { getCurrentValuationDetails } from 'reports/inventory/helpers';
 import { getDocStatus } from 'models/helpers';
 import { ModelNameEnum } from 'models/types';
 import { Field, Schema } from 'schemas/types';
@@ -254,6 +323,14 @@ export default defineComponent({
       showLinks: false,
       useFullWidth: false,
       row: null,
+      manufactureValues: [] as Array<{
+        item: string;
+        type: 'raw' | 'finished';
+        quantity: number;
+        rate: number;
+        value: number;
+      }>,
+      loadingValuation: false,
     } as {
       errors: Record<string, string>;
       activeTab: string;
@@ -262,6 +339,14 @@ export default defineComponent({
       showLinks: boolean;
       useFullWidth: boolean;
       row: null | { index: number; fieldname: string };
+      manufactureValues: Array<{
+        item: string;
+        type: 'raw' | 'finished';
+        quantity: number;
+        rate: number;
+        value: number;
+      }>;
+      loadingValuation: boolean;
     };
   },
   computed: {
@@ -379,6 +464,23 @@ export default defineComponent({
 
       return getGroupedActionsForDoc(this.doc);
     },
+    isManufactureStockMovement(): boolean {
+      if (!this.hasDoc) {
+        return false;
+      }
+      return (
+        this.schemaName === 'StockMovement' &&
+        this.doc.movementType === 'Manufacture'
+      );
+    },
+    hasBatches(): boolean {
+      return !!this.fyo.singles.InventorySettings?.enableBatches;
+    },
+    manufactureBalance(): number {
+      return this.manufactureValues.reduce((sum, item) => {
+        return sum + (item.type === 'finished' ? item.value : -item.value);
+      }, 0);
+    },
   },
   beforeMount() {
     this.useFullWidth = !!this.fyo.singles.Misc?.useFullWidth;
@@ -495,6 +597,95 @@ export default defineComponent({
       }
 
       this.updateGroupedFields();
+
+      // Update raw material values if items changed for Manufacture
+      if (
+        this.isManufactureStockMovement &&
+        fieldname === 'items'
+      ) {
+        await this.updateRawMaterialValues();
+      }
+    },
+    async updateRawMaterialValues() {
+      if (!this.isManufactureStockMovement || !this.doc.items) {
+        this.manufactureValues = [];
+        return;
+      }
+
+      this.loadingValuation = true;
+      const rawMaterials = this.doc.items.filter((item) => item.fromLocation);
+      const finishedGoods = this.doc.items.filter((item) => item.toLocation);
+
+      const values: Array<{
+        item: string;
+        type: 'raw' | 'finished';
+        quantity: number;
+        rate: number;
+        value: number;
+      }> = [];
+
+      // Process raw materials
+      for (const row of rawMaterials) {
+        if (!row.item || !row.fromLocation) {
+          continue;
+        }
+
+        const valuationDetails = await getCurrentValuationDetails(
+          this.fyo,
+          row.item,
+          row.fromLocation,
+          row.batch ?? null,
+          this.doc.date
+        );
+
+        if (valuationDetails) {
+          const movementQty = row.quantity ?? 0;
+          const movementValue = movementQty * valuationDetails.valuationRate;
+
+          values.push({
+            item: row.item,
+            type: 'raw',
+            quantity: movementQty,
+            rate: valuationDetails.valuationRate,
+            value: movementValue,
+          });
+        }
+      }
+
+      // Process finished goods (use entered rate and quantity)
+      for (const row of finishedGoods) {
+        if (!row.item || !row.toLocation) {
+          continue;
+        }
+
+        const qty = row.quantity ?? 0;
+        const rateValue = row.rate;
+        const rate =
+          typeof rateValue === 'object' && rateValue !== null && 'float' in rateValue
+            ? rateValue.float
+            : Number(rateValue ?? 0);
+        const value = qty * rate;
+
+        values.push({
+          item: row.item,
+          type: 'finished',
+          quantity: qty,
+          rate: rate,
+          value: value,
+        });
+      }
+
+      this.manufactureValues = values;
+      this.loadingValuation = false;
+    },
+    async onRowChange(field: Field, value: DocValue, parentField: Field) {
+      // Update grouped fields first
+      this.updateGroupedFields();
+
+      // Update raw material values if the changed row belongs to items table
+      if (parentField.fieldname === 'items' && this.isManufactureStockMovement) {
+        await this.updateRawMaterialValues();
+      }
     },
   },
 });

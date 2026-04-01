@@ -329,3 +329,52 @@ function updateCurrentBalances(
 
   sbe.valuationRate = sle.valuationRate;
 }
+
+export interface ValuationDetails {
+  quantity: number;
+  value: number;
+  valuationRate: number;
+}
+
+export async function getCurrentValuationDetails(
+  fyo: Fyo,
+  item: string,
+  location: string,
+  batch?: string | null,
+  toDate?: Date
+): Promise<ValuationDetails | null> {
+  const filters: QueryFilter = {
+    item,
+    location,
+    date: ['<=', (toDate ?? new Date()).toISOString()],
+  };
+
+  if (batch) {
+    filters.batch = batch;
+  }
+
+  const rawSLEs = await getRawStockLedgerEntries(fyo, filters);
+
+  const stockQueue = new StockQueue();
+
+  for (const sle of rawSLEs) {
+    const rate = safeParseFloat(sle.rate);
+    const quantity = safeParseFloat(sle.quantity);
+
+    if (quantity > 0) {
+      stockQueue.inward(rate, quantity);
+    } else if (quantity < 0) {
+      stockQueue.outward(-quantity);
+    }
+  }
+
+  if (stockQueue.quantity === 0) {
+    return null;
+  }
+
+  return {
+    quantity: stockQueue.quantity,
+    value: stockQueue.value,
+    valuationRate: stockQueue.fifo,
+  };
+}

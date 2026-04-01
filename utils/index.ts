@@ -259,3 +259,52 @@ export function removeAtIndex<T>(array: T[], index: number): T[] {
  * Asserts that `value` is of type T. Use with care.
  */
 export const assertIsType = <T>(value: unknown): value is T => true;
+
+/**
+ * Evaluates a basic math expression string and returns the numeric result.
+ * Supports: +, -, *, /, x, ÷, (), and decimal numbers.
+ * Returns NaN if the expression is invalid or cannot be evaluated.
+ *
+ * Examples:
+ *   "36.89/158" -> 0.23348101265822785
+ *   "100*1.15" -> 115
+ *   "(100+50)/3" -> 50
+ *   "10 + 20" -> 30
+ */
+export function evaluateMathExpression(input: string): number {
+  if (typeof input !== 'string') {
+    return NaN;
+  }
+
+  // Trim whitespace
+  const expr = input.trim();
+
+  // Check if the string contains any math operators
+  // If not, it's just a regular number and should not be evaluated as expression
+  const hasOperators = /[+\-*/x÷()]/.test(expr);
+  if (!hasOperators) {
+    return NaN;
+  }
+
+  // Replace 'x' and '÷' with '*' and '/' for evaluation
+  const normalizedExpr = expr.replace(/x/g, '*').replace(/÷/g, '/');
+
+  // Validate that the expression only contains allowed characters
+  // Allow: digits, decimal points, operators, parentheses, whitespace
+  if (!/^[\d\s+\-*/().]+$/.test(normalizedExpr)) {
+    return NaN;
+  }
+
+  try {
+    // Use Function constructor for evaluation (safe for local single-user app)
+    const result = new Function(`return (${normalizedExpr})`)();
+
+    if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
+      return result;
+    }
+
+    return NaN;
+  } catch {
+    return NaN;
+  }
+}
