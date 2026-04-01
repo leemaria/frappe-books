@@ -1,5 +1,5 @@
 <script lang="ts">
-import { safeParseFloat } from 'utils/index';
+import { evaluateMathExpression, safeParseFloat } from 'utils/index';
 import { defineComponent } from 'vue';
 import Int from './Int.vue';
 
@@ -13,6 +13,13 @@ export default defineComponent({
   },
   methods: {
     parse(value: unknown): number {
+      // Try to evaluate as math expression first if it's a string
+      if (typeof value === 'string') {
+        const evaluated = evaluateMathExpression(value);
+        if (!isNaN(evaluated)) {
+          return evaluated;
+        }
+      }
       return safeParseFloat(value);
     },
   },
