@@ -17,7 +17,7 @@ export class StockQueue {
      * ∴ FIFO by default. This returns FIFO valuation rate.
      */
     const valuation = this.value / this.quantity;
-    if (Number.isNaN(valuation)) {
+    if (Number.isNaN(valuation) || !Number.isFinite(valuation)) {
       return 0;
     }
 
