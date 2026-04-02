@@ -11,8 +11,8 @@
       "fieldname": "name",
       "fieldtype": "Data",
       "required": true,
-      "readOnly": true,
-      "hidden": true
+      "readOnly": false,
+      "hidden": false
     },
     {
       "abstract": true,

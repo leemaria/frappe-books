@@ -2,7 +2,7 @@
   "name": "SalesInvoice",
   "label": "Sales Invoice",
   "extends": "Invoice",
-  "naming": "numberSeries",
+  "naming": "manual",
   "showTitle": true,
   "fields": [
     {
